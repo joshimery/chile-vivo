@@ -1,0 +1,371 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chile Vivo — Santiago 3D</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;overflow:hidden;background:#87b9db;font-family:Arial,sans-serif}
+#hud{position:fixed;top:15px;left:15px;background:#152332dd;color:white;padding:15px;border-radius:12px;z-index:5;max-width:340px}
+#hud h2{margin:0 0 8px;font-size:20px}
+#hud p{margin:5px 0;font-size:13px}
+#start{position:fixed;inset:0;background:#102033ee;color:white;display:flex;align-items:center;justify-content:center;flex-direction:column;z-index:10;text-align:center;padding:20px}
+#start h1{font-size:clamp(36px,7vw,72px);margin:10px}
+button{padding:12px 22px;border:0;border-radius:10px;background:#ffca60;color:#17202b;font-weight:bold;cursor:pointer}
+#cross{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-size:24px;pointer-events:none}
+#dialog{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#142537ee;color:white;padding:18px;border-radius:12px;display:none;max-width:450px;width:85%;text-align:center}
+#help{position:fixed;bottom:12px;left:12px;color:white;background:#142537aa;padding:10px;border-radius:8px;font-size:12px}
+</style>
+</head>
+<body>
+<div id="start">
+<h1>CHILE VIVO</h1>
+<p>Un mundo social en Santiago de Chile</p>
+<p>Versión inicial · Motor Three.js</p>
+<button id="play">COMENZAR A JUGAR</button>
+</div>
+<div id="hud">
+<h2>🇨🇱 CHILE VIVO</h2>
+<p id="time">Hora: 10:00</p>
+<p id="location">Sector: Plaza de Armas — prototipo</p>
+<p id="people">Personajes: 12</p>
+<p id="fps">FPS: --</p>
+</div>
+<div id="cross">+</div>
+<div id="dialog"></div>
+<div id="help">WASD: caminar · Ratón: mirar · Shift: correr · E: hablar · ESC: liberar ratón</div>
+
+<script type="module">
+import * as THREE from "https://esm.sh/three@0.170.0";
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x91c3e4);
+scene.fog=new THREE.Fog(0x91c3e4,100,300);
+
+const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.1,700);
+camera.position.set(0,1.7,12);
+
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xddeeff,0x77705c,2));
+
+const sun=new THREE.DirectionalLight(0xffe5b2,2.5);
+sun.position.set(50,90,35);
+sun.castShadow=true;
+sun.shadow.mapSize.set(1024,1024);
+sun.shadow.camera.left=-100;
+sun.shadow.camera.right=100;
+sun.shadow.camera.top=100;
+sun.shadow.camera.bottom=-100;
+scene.add(sun);
+
+const mat=(color)=>new THREE.MeshLambertMaterial({color});
+
+const ground=new THREE.Mesh(
+new THREE.PlaneGeometry(600,600),
+mat(0x789966)
+);
+ground.rotation.x=-Math.PI/2;
+ground.receiveShadow=true;
+scene.add(ground);
+
+function cube(x,y,z,w,h,d,color){
+const mesh=new THREE.Mesh(
+new THREE.BoxGeometry(w,h,d),mat(color)
+);
+mesh.position.set(x,y,z);
+mesh.castShadow=true;
+mesh.receiveShadow=true;
+scene.add(mesh);
+return mesh;
+}
+
+// Plaza central de prueba
+cube(0,.04,0,90,.08,90,0xc3b8a5);
+
+// Senderos
+cube(0,.1,0,12,.1,90,0x9e8e80);
+cube(0,.11,0,90,.1,12,0x9e8e80);
+
+// Jardines
+for(let x of [-30,30]){
+for(let z of [-30,30]){
+cube(x,.13,z,25,.2,25,0x67995b);
+}
+}
+
+// Edificios provisionales
+const colors=[0xd9c5a6,0xc8b7a4,0xe0d3bf,0xb7c1c7];
+
+for(let i=0;i<18;i++){
+let side=i<9?-1:1;
+let index=i%9;
+let h=12+(i*7)%28;
+cube(
+side*(65+(index%3)*19),
+h/2,
+-65+Math.floor(index/3)*50,
+16,h,24,
+colors[i%4]
+);
+}
+
+// Fachada monumental estilizada provisional
+cube(0,11,-65,42,22,10,0xd6c3a1);
+
+for(let x of [-15,15]){
+cube(x,19,-65,8,38,8,0xcbb590);
+cube(x,39,-65,10,5,10,0xb4a080);
+}
+
+for(let x of [-12,0,12]){
+cube(x,5,-59.8,5,10,.3,0x665443);
+}
+
+// Palmeras estilizadas
+function palm(x,z){
+const trunk=new THREE.Mesh(
+new THREE.CylinderGeometry(.4,.65,13,7),
+mat(0x816345)
+);
+trunk.position.set(x,6.5,z);
+scene.add(trunk);
+
+for(let i=0;i<9;i++){
+const leaf=new THREE.Mesh(
+new THREE.ConeGeometry(1.4,8,4),
+mat(0x356c43)
+);
+leaf.rotation.z=Math.PI/2.8;
+leaf.rotation.y=i*Math.PI*2/9;
+leaf.position.set(
+x+Math.cos(i*Math.PI*2/9)*2,
+13,
+z+Math.sin(i*Math.PI*2/9)*2
+);
+scene.add(leaf);
+}
+}
+
+for(let x of [-38,-24,24,38]){
+palm(x,-35);
+palm(x,35);
+}
+
+// Personajes provisionales
+const names=[
+"Joshi","Alejandra","Beypher","Fernanda",
+"Martina","Nancy","Jhosselyn","Josemith",
+"Valery","Andrea","Sophia","Oscar"
+];
+
+const npcs=[];
+
+names.forEach((name,i)=>{
+const group=new THREE.Group();
+
+const shirt=mat(new THREE.Color().setHSL(i/12,.55,.55));
+const skin=mat(0xd6a17e);
+const pants=mat(0x343c55);
+
+function part(w,h,d,x,y,z,m){
+const obj=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);
+obj.position.set(x,y,z);
+group.add(obj);
+return obj;
+}
+
+part(.65,.85,.35,0,1.15,0,shirt);
+part(.48,.48,.48,0,1.85,0,skin);
+part(.5,.16,.5,0,2.16,0,mat(0x332b2b));
+
+const left=part(.22,.7,.3,-.17,.38,0,pants);
+const right=part(.22,.7,.3,.17,.38,0,pants);
+
+group.position.set(
+(i%4-1.5)*8,
+0,
+Math.floor(i/4)*10-8
+);
+
+scene.add(group);
+
+npcs.push({
+name,group,left,right,
+target:new THREE.Vector3(
+Math.random()*50-25,0,Math.random()*50-25
+),
+speed:.8+Math.random()*.5
+});
+});
+
+// Movimiento del jugador
+const keys={};
+let yaw=0,pitch=0;
+let playing=false;
+
+document.getElementById("play").onclick=()=>{
+document.getElementById("start").style.display="none";
+playing=true;
+renderer.domElement.requestPointerLock();
+};
+
+renderer.domElement.onclick=()=>{
+if(playing)renderer.domElement.requestPointerLock();
+};
+
+document.addEventListener("keydown",e=>{
+keys[e.code]=true;
+if(e.code==="KeyE")talk();
+});
+
+document.addEventListener("keyup",e=>keys[e.code]=false);
+
+document.addEventListener("mousemove",e=>{
+if(document.pointerLockElement===renderer.domElement){
+yaw-=e.movementX*.002;
+pitch=THREE.MathUtils.clamp(
+pitch-e.movementY*.002,-1.4,1.4
+);
+}
+});
+
+function talk(){
+if(!playing)return;
+let nearest=null;
+let distance=4;
+
+for(const npc of npcs){
+const d=camera.position.distanceTo(
+npc.group.position.clone().add(new THREE.Vector3(0,1.5,0))
+);
+if(d<distance){
+distance=d;
+nearest=npc;
+}
+}
+
+const dialog=document.getElementById("dialog");
+dialog.style.display="block";
+
+const messages=[
+"¡Holaaa! ¿Cómo estás?",
+"Qué bonito está Santiago hoy.",
+"¿Vamos a dar una vuelta?",
+"Me encontré con alguien interesante.",
+"Estoy pensando qué hacer esta tarde."
+];
+
+dialog.textContent=nearest
+?nearest.name+": "+messages[Math.floor(Math.random()*messages.length)]
+:"No hay ningún personaje suficientemente cerca.";
+
+clearTimeout(window.dialogTimer);
+window.dialogTimer=setTimeout(()=>{
+dialog.style.display="none";
+},4000);
+}
+
+// Tiempo y animación
+const clock=new THREE.Clock();
+let gameHour=10;
+let elapsed=0;
+let frames=0;
+let fpsTimer=0;
+
+function animate(){
+requestAnimationFrame(animate);
+const dt=Math.min(clock.getDelta(),.05);
+elapsed+=dt;
+
+if(playing){
+camera.rotation.order="YXZ";
+camera.rotation.y=yaw;
+camera.rotation.x=pitch;
+
+const direction=new THREE.Vector3(
+Number(!!keys.KeyD)-Number(!!keys.KeyA),
+0,
+Number(!!keys.KeyS)-Number(!!keys.KeyW)
+);
+
+if(direction.lengthSq()>0){
+direction.normalize();
+direction.applyAxisAngle(new THREE.Vector3(0,1,0),yaw);
+camera.position.addScaledVector(
+direction,
+dt*(keys.ShiftLeft?10:5)
+);
+}
+
+camera.position.x=THREE.MathUtils.clamp(camera.position.x,-48,48);
+camera.position.z=THREE.MathUtils.clamp(camera.position.z,-48,48);
+camera.position.y=1.7;
+
+gameHour=(gameHour+dt*.025)%24;
+
+for(const npc of npcs){
+const p=npc.group.position;
+const diff=npc.target.clone().sub(p);
+diff.y=0;
+
+if(diff.length()<.5){
+npc.target.set(
+Math.random()*65-32,
+0,
+Math.random()*65-32
+);
+}else{
+diff.normalize();
+p.addScaledVector(diff,dt*npc.speed);
+npc.group.rotation.y=Math.atan2(diff.x,diff.z);
+npc.left.rotation.x=Math.sin(elapsed*7)*.4;
+npc.right.rotation.x=-npc.left.rotation.x;
+}
+}
+
+const daylight=Math.max(.15,Math.sin(gameHour/24*Math.PI*2-Math.PI/2)*.5+.5);
+sun.intensity=.5+daylight*2.5;
+scene.background.setRGB(
+.08+daylight*.5,
+.12+daylight*.65,
+.2+daylight*.7
+);
+scene.fog.color.copy(scene.background);
+
+const hh=Math.floor(gameHour);
+const mm=Math.floor((gameHour%1)*60);
+document.getElementById("time").textContent=
+"Hora: "+String(hh).padStart(2,"0")+":"+
+String(mm).padStart(2,"0");
+}
+
+frames++;
+fpsTimer+=dt;
+if(fpsTimer>=1){
+document.getElementById("fps").textContent=
+"FPS: "+Math.round(frames/fpsTimer);
+frames=0;
+fpsTimer=0;
+}
+
+renderer.render(scene,camera);
+}
+
+animate();
+
+window.addEventListener("resize",()=>{
+camera.aspect=innerWidth/innerHeight;
+camera.updateProjectionMatrix();
+renderer.setSize(innerWidth,innerHeight);
+});
+</script>
+</body>
+</html>
